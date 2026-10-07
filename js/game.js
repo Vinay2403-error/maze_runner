@@ -1,5 +1,5 @@
 /**
- * Maze Runner Game Engine (Campaign, Auth, & Pause System)
+ * Maze Runner Game Engine (Interactive Upgrades & Bug Fixes)
  */
 class Game {
   constructor() {
@@ -26,15 +26,16 @@ class Game {
 
     // Entities
     this.maze = null;
-    this.player = { r: 0, c: 0, x: 0, y: 0, speedBoostTimer: 0 };
+    this.player = { r: 0, c: 0, x: 0, y: 0, speedBoostTimer: 0, autoPath: [] };
     this.enemy = { r: 0, c: 0, x: 0, y: 0, path: [], moveTimer: 0, freezeTimer: 0, visitedNodes: [] };
     this.goal = { r: 0, c: 0 };
 
-    // Active Buffs / Effects
+    // Active Buffs, Floating Popups & Effects
     this.activeBuff = 'None';
     this.hintTimer = 0;
     this.hintPath = [];
     this.particles = [];
+    this.popups = []; // Array of floating text popups { x, y, text, color, life }
 
     // Keys
     this.keys = {};
@@ -50,16 +51,14 @@ class Game {
 
     // 1. Initialize UI elements
     this.initUI();
-    // 2. Initialize maze synchronously FIRST so render() never encounters null
+    // 2. Initialize maze synchronously FIRST
     this.initMaze();
     // 3. Set up input & event listeners
     this.setupEventListeners();
-
     // 4. Async loading (User Auth & Campaign Levels)
     this.checkUserAuth();
     this.loadCampaignLevelById(1);
-
-    // 5. Start main animation game loop
+    // 5. Start main animation loop
     this.startLoop();
   }
 
@@ -153,7 +152,7 @@ class Game {
         this.startLevel(levelObj);
       }
     } catch (e) {
-      // Fallback offline level 1
+      // Fallback offline level
       this.startLevel({ id: levelId, name: `Level ${levelId}`, grid: 15, algo: 'bfs', speed: 'easy', fog: false });
     }
   }
@@ -187,15 +186,18 @@ class Game {
     this.maze = new Maze(this.rows, this.cols);
     this.maze.generate();
 
+    // Reset player position & state
     this.player.r = 0;
     this.player.c = 0;
     this.player.x = (0 + 0.5) * this.cellSize;
     this.player.y = (0 + 0.5) * this.cellSize;
     this.player.speedBoostTimer = 0;
+    this.player.autoPath = [];
 
     this.goal.r = this.rows - 1;
     this.goal.c = this.cols - 1;
 
+    // Reset enemy position & state
     this.enemy.r = this.rows - 1;
     this.enemy.c = 0;
     this.enemy.x = (this.enemy.c + 0.5) * this.cellSize;
@@ -206,6 +208,7 @@ class Game {
     this.activeBuff = 'None';
     this.hintTimer = 0;
     this.particles = [];
+    this.popups = [];
 
     this.updateAIPath();
 
@@ -224,7 +227,7 @@ class Game {
       }
     }, 1000);
 
-    // Hide all modals
+    // Hide modals
     this.ui.winModal.classList.add('hidden');
     this.ui.loseModal.classList.add('hidden');
     this.ui.pauseModal.classList.add('hidden');
@@ -251,6 +254,7 @@ class Game {
         return;
       }
       this.keys[e.code] = true;
+      this.player.autoPath = []; // Stop auto-walk if manual keys pressed
       this.handlePlayerInput();
     });
 
@@ -264,8 +268,36 @@ class Game {
       const dir = btn.getAttribute('data-dir');
       btn.addEventListener('click', () => {
         sounds.init();
+        this.player.autoPath = [];
         this.movePlayerDirection(dir);
       });
+    });
+
+    // Interactive Click / Tap on Canvas to Auto-Walk
+    this.canvas.addEventListener('click', (e) => {
+      if (!this.isPlaying || this.isPaused || !this.maze) return;
+      sounds.init();
+
+      const rect = this.canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      const targetC = Math.floor(clickX / this.cellSize);
+      const targetR = Math.floor(clickY / this.cellSize);
+
+      if (targetR >= 0 && targetR < this.rows && targetC >= 0 && targetC < this.cols) {
+        const pathResult = Pathfinder.findPath(
+          this.maze,
+          { r: this.player.r, c: this.player.c },
+          { r: targetR, c: targetC },
+          'astar'
+        );
+
+        if (pathResult.path && pathResult.path.length > 1) {
+          this.player.autoPath = pathResult.path.slice(1); // Remove starting position
+          this.addPopup(clickX, clickY, '🎯', '#00f3ff');
+        }
+      }
     });
 
     // Pause Controls
@@ -277,10 +309,12 @@ class Game {
     this.ui.algoSelect.addEventListener('change', () => {
       this.algorithm = this.ui.algoSelect.value;
       this.updateAIPath();
+      this.addPopup(this.canvas.width / 2, 40, `AI Mode: ${this.algorithm.toUpperCase()}`, '#ff0055');
     });
 
     this.ui.speedSelect.addEventListener('change', () => {
       this.aiSpeedMode = this.ui.speedSelect.value;
+      this.addPopup(this.canvas.width / 2, 40, `AI Speed: ${this.aiSpeedMode.toUpperCase()}`, '#ff0055');
     });
 
     this.ui.sizeSelect.addEventListener('change', () => {
@@ -445,6 +479,25 @@ class Game {
     const moveDelay = this.player.speedBoostTimer > 0 ? 80 : 130;
     if (now - this.lastMoveTime < moveDelay) return;
 
+    // Handle Auto-path walking (Click to walk)
+    if (this.player.autoPath && this.player.autoPath.length > 0) {
+      const nextCell = this.player.autoPath.shift();
+      this.player.r = nextCell.r;
+      this.player.c = nextCell.c;
+      this.lastMoveTime = now;
+
+      sounds.playStep();
+      this.addParticles((nextCell.c + 0.5) * this.cellSize, (nextCell.r + 0.5) * this.cellSize, '#00f3ff', 3);
+      this.checkPowerUpCollection();
+      this.updateAIPath();
+
+      if (this.player.r === this.goal.r && this.player.c === this.goal.c) {
+        this.triggerWin();
+      }
+      return;
+    }
+
+    // Handle Manual Keyboard Input
     let moved = false;
     if (this.keys['ArrowUp'] || this.keys['KeyW']) moved = this.movePlayerDirection('UP');
     else if (this.keys['ArrowDown'] || this.keys['KeyS']) moved = this.movePlayerDirection('DOWN');
@@ -494,23 +547,29 @@ class Game {
       const powerUp = this.maze.powerUps[pIndex];
       this.maze.powerUps.splice(pIndex, 1);
 
+      const px = (this.player.c + 0.5) * this.cellSize;
+      const py = (this.player.r + 0.5) * this.cellSize;
+
       if (powerUp.type === 'speed') {
         this.player.speedBoostTimer = 6000;
         this.activeBuff = 'Speed ⚡';
         sounds.playPowerUp();
+        this.addPopup(px, py - 20, '⚡ SPEED BOOST!', '#ffd700');
       } else if (powerUp.type === 'freeze') {
         this.enemy.freezeTimer = 4500;
         this.activeBuff = 'Freeze ❄️';
         sounds.playFreeze();
+        this.addPopup(px, py - 20, '❄️ AI FROZEN!', '#00d2ff');
       } else if (powerUp.type === 'hint') {
         this.hintTimer = 6000;
         this.activeBuff = 'Hint 💡';
         const hintResult = Pathfinder.findPath(this.maze, { r: this.player.r, c: this.player.c }, this.goal, 'astar');
         this.hintPath = hintResult.path;
         sounds.playPowerUp();
+        this.addPopup(px, py - 20, '💡 ROUTE HINT!', '#00ff66');
       }
 
-      this.addParticles((this.player.c + 0.5) * this.cellSize, (this.player.r + 0.5) * this.cellSize, '#ffd700', 12);
+      this.addParticles(px, py, '#ffd700', 14);
     }
   }
 
@@ -530,6 +589,16 @@ class Game {
 
   updateEnemy(deltaMs) {
     if (!this.isPlaying || this.isPaused || !this.maze) return;
+
+    // Continuous pixel-distance collision detection check
+    const dx = this.player.x - this.enemy.x;
+    const dy = this.player.y - this.enemy.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < this.cellSize * 0.45 && this.enemy.freezeTimer <= 0) {
+      this.triggerLose();
+      return;
+    }
 
     if (this.enemy.freezeTimer > 0) {
       this.enemy.freezeTimer -= deltaMs;
@@ -593,6 +662,16 @@ class Game {
       }
     }
 
+    // Trigger fireworks particles
+    for (let i = 0; i < 40; i++) {
+      this.addParticles(
+        Math.random() * this.canvas.width,
+        Math.random() * this.canvas.height,
+        ['#00ff66', '#00f3ff', '#ffd700'][i % 3],
+        1
+      );
+    }
+
     this.ui.winModal.classList.remove('hidden');
   }
 
@@ -604,6 +683,10 @@ class Game {
     const distToExit = Math.abs(this.player.r - this.goal.r) + Math.abs(this.player.c - this.goal.c);
     this.ui.loseTime.textContent = this.ui.timer.textContent;
     this.ui.loseDist.textContent = `${distToExit} steps`;
+
+    // Red explosion particle burst at player location
+    this.addParticles(this.player.x, this.player.y, '#ff0055', 25);
+
     this.ui.loseModal.classList.remove('hidden');
   }
 
@@ -630,6 +713,19 @@ class Game {
     }
   }
 
+  addPopup(x, y, text, color = '#ffffff') {
+    this.popups.push({ x, y, text, color, life: 1.0 });
+  }
+
+  updatePopups() {
+    for (let i = this.popups.length - 1; i >= 0; i--) {
+      const p = this.popups[i];
+      p.y -= 0.8;
+      p.life -= 0.025;
+      if (p.life <= 0) this.popups.splice(i, 1);
+    }
+  }
+
   updateHUD() {
     if (!this.maze) return;
     const goalDist = Math.abs(this.player.r - this.goal.r) + Math.abs(this.player.c - this.goal.c);
@@ -641,18 +737,19 @@ class Game {
   }
 
   render() {
-    // Safety guard: do not render if maze is not initialized yet
     if (!this.maze || !this.maze.grid) return;
 
     const { ctx, canvas, cellSize, rows, cols } = this;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Smooth position interpolation
     this.player.x += ((this.player.c + 0.5) * cellSize - this.player.x) * 0.35;
     this.player.y += ((this.player.r + 0.5) * cellSize - this.player.y) * 0.35;
 
     this.enemy.x += ((this.enemy.c + 0.5) * cellSize - this.enemy.x) * 0.25;
     this.enemy.y += ((this.enemy.r + 0.5) * cellSize - this.enemy.y) * 0.25;
 
+    // 1. Visited Search Frontier Nodes
     if (this.showPath && this.enemy.visitedNodes) {
       ctx.fillStyle = 'rgba(157, 78, 221, 0.15)';
       for (const node of this.enemy.visitedNodes) {
@@ -660,6 +757,7 @@ class Game {
       }
     }
 
+    // 2. AI Enemy Path Line Debugger
     if (this.showPath && this.enemy.path && this.enemy.path.length > 1) {
       ctx.beginPath();
       ctx.strokeStyle = 'rgba(255, 0, 85, 0.6)';
@@ -677,6 +775,7 @@ class Game {
       ctx.setLineDash([]);
     }
 
+    // 3. Hint Route Line
     if (this.hintTimer > 0 && this.hintPath && this.hintPath.length > 0) {
       ctx.beginPath();
       ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
@@ -691,6 +790,19 @@ class Game {
       ctx.stroke();
     }
 
+    // 4. Auto-walk click path line
+    if (this.player.autoPath && this.player.autoPath.length > 0) {
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(0, 243, 255, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.moveTo(this.player.x, this.player.y);
+      for (const pt of this.player.autoPath) {
+        ctx.lineTo((pt.c + 0.5) * cellSize, (pt.r + 0.5) * cellSize);
+      }
+      ctx.stroke();
+    }
+
+    // 5. Maze Walls
     ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = Math.max(2, cellSize * 0.1);
     ctx.shadowColor = 'rgba(0, 243, 255, 0.15)';
@@ -713,6 +825,7 @@ class Game {
     }
     ctx.shadowBlur = 0;
 
+    // 6. Exit Portal (Goal)
     const goalX = (this.goal.c + 0.5) * cellSize;
     const goalY = (this.goal.r + 0.5) * cellSize;
     const goalRadius = cellSize * 0.35;
@@ -722,10 +835,11 @@ class Game {
     ctx.rotate(Date.now() * 0.002);
     ctx.fillStyle = '#00ff66';
     ctx.shadowColor = '#00ff66';
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 14;
     ctx.fillRect(-goalRadius, -goalRadius, goalRadius * 2, goalRadius * 2);
     ctx.restore();
 
+    // 7. Power-Up Icons
     if (this.maze.powerUps) {
       for (const p of this.maze.powerUps) {
         const px = (p.c + 0.5) * cellSize;
@@ -742,6 +856,7 @@ class Game {
       }
     }
 
+    // 8. Particles
     for (const p of this.particles) {
       ctx.fillStyle = p.color;
       ctx.globalAlpha = p.life;
@@ -751,6 +866,7 @@ class Game {
       ctx.globalAlpha = 1.0;
     }
 
+    // 9. Player Character
     const playerRadius = cellSize * 0.32;
     ctx.beginPath();
     ctx.arc(this.player.x, this.player.y, playerRadius, 0, Math.PI * 2);
@@ -760,6 +876,7 @@ class Game {
     ctx.fill();
     ctx.shadowBlur = 0;
 
+    // 10. AI Enemy Chaser
     const enemyRadius = cellSize * 0.34;
     ctx.beginPath();
     ctx.arc(this.enemy.x, this.enemy.y, enemyRadius, 0, Math.PI * 2);
@@ -777,6 +894,18 @@ class Game {
       ctx.fillText('❄️', this.enemy.x, this.enemy.y);
     }
 
+    // 11. Render Popups Text
+    for (const p of this.popups) {
+      ctx.save();
+      ctx.font = 'bold 13px Orbitron, sans-serif';
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.life;
+      ctx.textAlign = 'center';
+      ctx.fillText(p.text, p.x, p.y);
+      ctx.restore();
+    }
+
+    // 12. Fog of War Spotlight
     if (this.fogOfWar) {
       ctx.save();
       ctx.fillStyle = '#050811';
@@ -799,6 +928,7 @@ class Game {
       this.handlePlayerInput();
       this.updateEnemy(deltaMs);
       this.updateParticles();
+      this.updatePopups();
       this.updateHUD();
       this.render();
 

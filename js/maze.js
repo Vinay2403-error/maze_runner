@@ -41,11 +41,8 @@ class Maze {
     while (unvisitedCount > 0) {
       const neighbors = this.getUnvisitedNeighbors(current);
       if (neighbors.length > 0) {
-        // Pick random unvisited neighbor
         const next = neighbors[Math.floor(Math.random() * neighbors.length)];
         stack.push(current);
-
-        // Remove wall between current and next
         this.removeWall(current, next);
 
         current = next;
@@ -56,10 +53,10 @@ class Maze {
       }
     }
 
-    // Optionally break a small percentage of extra internal walls (e.g. 3%) to allow multiple alternate loops/routes
+    // Add ~4% extra internal wall breaks to create multi-path corridors
     this.addLoops(0.04);
 
-    // Spawn powerups across the maze
+    // Spawn power-ups away from spawn/exit points
     this.spawnPowerUps();
   }
 
@@ -79,18 +76,18 @@ class Maze {
     const dr = a.r - b.r;
     const dc = a.c - b.c;
 
-    if (dr === 1) { // b is above a
+    if (dr === 1) {
       a.walls.top = false;
       b.walls.bottom = false;
-    } else if (dr === -1) { // b is below a
+    } else if (dr === -1) {
       a.walls.bottom = false;
       b.walls.top = false;
     }
 
-    if (dc === 1) { // b is to the left of a
+    if (dc === 1) {
       a.walls.left = false;
       b.walls.right = false;
-    } else if (dc === -1) { // b is to the right of a
+    } else if (dc === -1) {
       a.walls.right = false;
       b.walls.left = false;
     }
@@ -118,7 +115,7 @@ class Maze {
   spawnPowerUps() {
     this.powerUps = [];
     const types = ['speed', 'freeze', 'hint'];
-    const count = Math.max(3, Math.floor((this.rows * this.cols) / 50));
+    const count = Math.max(3, Math.floor((this.rows * this.cols) / 45));
 
     for (let i = 0; i < count; i++) {
       let r, c;
@@ -128,11 +125,14 @@ class Maze {
         c = Math.floor(Math.random() * this.cols);
         attempts++;
       } while (
-        ( (r === 0 && c === 0) || (r === this.rows - 1 && c === this.cols - 1) || this.hasPowerUpAt(r, c) ) &&
-        attempts < 100
+        ( (r === 0 && c === 0) || // Player spawn
+          (r === this.rows - 1 && c === this.cols - 1) || // Goal portal
+          (r === this.rows - 1 && c === 0) || // Enemy spawn
+          this.hasPowerUpAt(r, c)
+        ) && attempts < 150
       );
 
-      if (attempts < 100) {
+      if (attempts < 150) {
         const type = types[i % types.length];
         this.powerUps.push({ r, c, type });
       }
