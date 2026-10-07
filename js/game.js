@@ -11,14 +11,14 @@ class Game {
     this.cols = 15;
     this.cellSize = 30;
 
-    this.algorithm = 'astar';
-    this.aiSpeedMode = 'medium';
+    this.algorithm = 'bfs';
+    this.aiSpeedMode = 'easy';
     this.showPath = true;
     this.fogOfWar = false;
 
     this.isPlaying = false;
     this.isPaused = false;
-    this.currentLevel = null; // null for Free Play, or Level object
+    this.currentLevel = null;
 
     this.startTime = 0;
     this.elapsedTime = 0;
@@ -48,10 +48,18 @@ class Game {
       nightmare: 120
     };
 
+    // 1. Initialize UI elements
     this.initUI();
+    // 2. Initialize maze synchronously FIRST so render() never encounters null
+    this.initMaze();
+    // 3. Set up input & event listeners
     this.setupEventListeners();
+
+    // 4. Async loading (User Auth & Campaign Levels)
     this.checkUserAuth();
-    this.loadCampaignLevelById(1); // Default to Campaign Level 1
+    this.loadCampaignLevelById(1);
+
+    // 5. Start main animation game loop
     this.startLoop();
   }
 
@@ -229,7 +237,7 @@ class Game {
     if (this.isPaused) {
       this.ui.pauseModal.classList.remove('hidden');
     } else {
-      this.startTime = Date.now() - (this.elapsedTime * 1000); // Adjust start time for pause duration
+      this.startTime = Date.now() - (this.elapsedTime * 1000);
       this.ui.pauseModal.classList.add('hidden');
     }
   }
@@ -431,7 +439,7 @@ class Game {
   }
 
   handlePlayerInput() {
-    if (!this.isPlaying || this.isPaused) return;
+    if (!this.isPlaying || this.isPaused || !this.maze) return;
 
     const now = performance.now();
     const moveDelay = this.player.speedBoostTimer > 0 ? 80 : 130;
@@ -450,6 +458,7 @@ class Game {
   }
 
   movePlayerDirection(dir) {
+    if (!this.maze || !this.maze.grid) return false;
     const { r, c } = this.player;
     const cell = this.maze.grid[r][c];
 
@@ -479,6 +488,7 @@ class Game {
   }
 
   checkPowerUpCollection() {
+    if (!this.maze || !this.maze.powerUps) return;
     const pIndex = this.maze.powerUps.findIndex(p => p.r === this.player.r && p.c === this.player.c);
     if (pIndex !== -1) {
       const powerUp = this.maze.powerUps[pIndex];
@@ -513,13 +523,13 @@ class Game {
     this.enemy.path = result.path;
     this.enemy.visitedNodes = result.visitedNodes;
 
-    this.ui.statNodes.textContent = result.exploredCount;
-    this.ui.statTime.textContent = `${result.computeTimeMs} ms`;
-    this.ui.statLength.textContent = `${result.path.length} steps`;
+    if (this.ui.statNodes) this.ui.statNodes.textContent = result.exploredCount;
+    if (this.ui.statTime) this.ui.statTime.textContent = `${result.computeTimeMs} ms`;
+    if (this.ui.statLength) this.ui.statLength.textContent = `${result.path.length} steps`;
   }
 
   updateEnemy(deltaMs) {
-    if (!this.isPlaying || this.isPaused) return;
+    if (!this.isPlaying || this.isPaused || !this.maze) return;
 
     if (this.enemy.freezeTimer > 0) {
       this.enemy.freezeTimer -= deltaMs;
@@ -552,7 +562,7 @@ class Game {
     if (this.enemy.moveTimer >= interval) {
       this.enemy.moveTimer = 0;
 
-      if (this.enemy.path.length > 1) {
+      if (this.enemy.path && this.enemy.path.length > 1) {
         const nextStep = this.enemy.path[1];
         this.enemy.r = nextStep.r;
         this.enemy.c = nextStep.c;
@@ -575,7 +585,6 @@ class Game {
     this.ui.winAlgo.textContent = this.algorithm.toUpperCase();
     this.ui.winSize.textContent = `${this.rows}x${this.cols}`;
 
-    // Save level completion to backend if playing campaign
     if (this.currentLevel) {
       try {
         await api.completeLevel(this.currentLevel.id, this.elapsedTime);
@@ -622,6 +631,7 @@ class Game {
   }
 
   updateHUD() {
+    if (!this.maze) return;
     const goalDist = Math.abs(this.player.r - this.goal.r) + Math.abs(this.player.c - this.goal.c);
     const enemyDist = Math.abs(this.player.r - this.enemy.r) + Math.abs(this.player.c - this.enemy.c);
 
@@ -631,6 +641,9 @@ class Game {
   }
 
   render() {
+    // Safety guard: do not render if maze is not initialized yet
+    if (!this.maze || !this.maze.grid) return;
+
     const { ctx, canvas, cellSize, rows, cols } = this;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -647,7 +660,7 @@ class Game {
       }
     }
 
-    if (this.showPath && this.enemy.path.length > 1) {
+    if (this.showPath && this.enemy.path && this.enemy.path.length > 1) {
       ctx.beginPath();
       ctx.strokeStyle = 'rgba(255, 0, 85, 0.6)';
       ctx.lineWidth = Math.max(2, cellSize * 0.15);
@@ -664,7 +677,7 @@ class Game {
       ctx.setLineDash([]);
     }
 
-    if (this.hintTimer > 0 && this.hintPath.length > 0) {
+    if (this.hintTimer > 0 && this.hintPath && this.hintPath.length > 0) {
       ctx.beginPath();
       ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
       ctx.lineWidth = Math.max(3, cellSize * 0.2);
@@ -686,6 +699,7 @@ class Game {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const cell = this.maze.grid[r][c];
+        if (!cell) continue;
         const x = c * cellSize;
         const y = r * cellSize;
 
@@ -712,18 +726,20 @@ class Game {
     ctx.fillRect(-goalRadius, -goalRadius, goalRadius * 2, goalRadius * 2);
     ctx.restore();
 
-    for (const p of this.maze.powerUps) {
-      const px = (p.c + 0.5) * cellSize;
-      const py = (p.r + 0.5) * cellSize;
-      ctx.font = `${Math.floor(cellSize * 0.6)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+    if (this.maze.powerUps) {
+      for (const p of this.maze.powerUps) {
+        const px = (p.c + 0.5) * cellSize;
+        const py = (p.r + 0.5) * cellSize;
+        ctx.font = `${Math.floor(cellSize * 0.6)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
 
-      let icon = '⚡';
-      if (p.type === 'freeze') icon = '❄️';
-      else if (p.type === 'hint') icon = '💡';
+        let icon = '⚡';
+        if (p.type === 'freeze') icon = '❄️';
+        else if (p.type === 'hint') icon = '💡';
 
-      ctx.fillText(icon, px, py);
+        ctx.fillText(icon, px, py);
+      }
     }
 
     for (const p of this.particles) {

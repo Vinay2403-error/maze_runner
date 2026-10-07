@@ -5,9 +5,12 @@ class APIClient {
   constructor() {
     this.token = localStorage.getItem('maze_token') || null;
     this.user = null;
+    // Handle file:// protocol fallback to http://localhost:8000
+    this.baseUrl = (window.location.protocol.startsWith('http')) ? '' : 'http://localhost:8000';
   }
 
   async request(endpoint, options = {}) {
+    const url = `${this.baseUrl}${endpoint}`;
     const headers = {
       'Content-Type': 'application/json',
       ...options.headers
@@ -18,7 +21,7 @@ class APIClient {
     }
 
     try {
-      const response = await fetch(endpoint, { ...options, headers });
+      const response = await fetch(url, { ...options, headers });
       const data = await response.json();
 
       if (!response.ok) {
@@ -26,7 +29,7 @@ class APIClient {
       }
       return data;
     } catch (err) {
-      console.warn(`API Error [${endpoint}]:`, err.message);
+      console.warn(`API Error [${url}]:`, err.message);
       throw err;
     }
   }
