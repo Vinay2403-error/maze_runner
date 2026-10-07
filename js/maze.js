@@ -1,5 +1,5 @@
 /**
- * Maze Generator using Recursive Backtracking Algorithm
+ * Maze Generator using Recursive Backtracking + Multi-Path Loop Carving
  */
 class Cell {
   constructor(r, c) {
@@ -53,10 +53,13 @@ class Maze {
       }
     }
 
-    // Add ~4% extra internal wall breaks to create multi-path corridors
-    this.addLoops(0.04);
+    // 1. Carve 15% internal wall breaks across the maze for multi-path loops & shortcuts
+    this.addLoops(0.15);
 
-    // Spawn power-ups away from spawn/exit points
+    // 2. Explicitly guarantee multiple distinct entry routes to the Finish Point
+    this.carveMultipleGoalPaths();
+
+    // 3. Spawn power-ups
     this.spawnPowerUps();
   }
 
@@ -112,6 +115,47 @@ class Maze {
     }
   }
 
+  /**
+   * Specifically carves multiple distinct entrances & branching corridors
+   * leading directly into the Finish Exit cell (rows-1, cols-1).
+   */
+  carveMultipleGoalPaths() {
+    const goalR = this.rows - 1;
+    const goalC = this.cols - 1;
+    const goalCell = this.grid[goalR][goalC];
+
+    // Guarantee Top approach into goal
+    if (goalR > 0) {
+      const topCell = this.grid[goalR - 1][goalC];
+      this.removeWall(goalCell, topCell);
+    }
+
+    // Guarantee Left approach into goal
+    if (goalC > 0) {
+      const leftCell = this.grid[goalR][goalC - 1];
+      this.removeWall(goalCell, leftCell);
+    }
+
+    // Carve branching shortcuts 2 steps out from the goal
+    if (goalR > 1 && goalC > 0) {
+      const cellA = this.grid[goalR - 2][goalC];
+      const cellB = this.grid[goalR - 2][goalC - 1];
+      this.removeWall(cellA, cellB);
+    }
+
+    if (goalR > 0 && goalC > 1) {
+      const cellC = this.grid[goalR][goalC - 2];
+      const cellD = this.grid[goalR - 1][goalC - 2];
+      this.removeWall(cellC, cellD);
+    }
+
+    if (goalR > 1 && goalC > 1) {
+      const diagCell = this.grid[goalR - 1][goalC - 1];
+      const leftCell = this.grid[goalR - 1][goalC - 2];
+      this.removeWall(diagCell, leftCell);
+    }
+  }
+
   spawnPowerUps() {
     this.powerUps = [];
     const types = ['speed', 'freeze', 'hint'];
@@ -125,9 +169,9 @@ class Maze {
         c = Math.floor(Math.random() * this.cols);
         attempts++;
       } while (
-        ( (r === 0 && c === 0) || // Player spawn
-          (r === this.rows - 1 && c === this.cols - 1) || // Goal portal
-          (r === this.rows - 1 && c === 0) || // Enemy spawn
+        ( (r === 0 && c === 0) ||
+          (r === this.rows - 1 && c === this.cols - 1) ||
+          (r === this.rows - 1 && c === 0) ||
           this.hasPowerUpAt(r, c)
         ) && attempts < 150
       );
