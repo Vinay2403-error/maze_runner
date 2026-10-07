@@ -232,6 +232,26 @@ body {
   display: block;
 }
 
+/* Canvas-scoped Pause Overlay (Only covers canvas container) */
+.canvas-pause-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: 16px;
+  background: rgba(5, 8, 17, 0.86);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 50;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.canvas-pause-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Touch Controls */
 .touch-controls {
   display: none;
@@ -416,7 +436,7 @@ input:checked + .slider:before { transform: translateX(22px); background-color: 
 }
 .stats-panel strong { font-family: var(--font-header); color: var(--accent-cyan); }
 
-/* Modals */
+/* Full Page Modals (Auth, Levels, Leaderboard, Win, Lose) */
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -466,7 +486,21 @@ input:checked + .slider:before { transform: translateX(22px); background-color: 
 .close-modal-btn:hover { color: #fff; }
 
 /* Pause Card & Pause User Box */
-.pause-card { border-color: var(--accent-gold); }
+.pause-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--accent-gold);
+  border-radius: 20px;
+  padding: 1.8rem;
+  width: 90%;
+  max-width: 400px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  animation: modalPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
 .pause-card h2 { color: var(--accent-gold); font-family: var(--font-header); }
 
 .pause-user-box {

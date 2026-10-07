@@ -1,5 +1,5 @@
 /**
- * Maze Runner Game Engine (Auto-Pause & Pause Auth Integration)
+ * Maze Runner Game Engine (Canvas-Scoped Pause & Scroll Fix)
  */
 class Game {
   constructor() {
@@ -257,8 +257,13 @@ class Game {
   }
 
   setupEventListeners() {
-    // Keyboard listeners
+    // Keyboard listeners with scroll prevention
     window.addEventListener('keydown', (e) => {
+      // Prevent browser scrolling on Arrow keys and Spacebar
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+        e.preventDefault();
+      }
+
       sounds.init();
       if (e.code === 'KeyP' || e.code === 'Escape') {
         this.togglePause();

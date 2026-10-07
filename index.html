@@ -68,6 +68,25 @@
           <button class="dbtn right" data-dir="RIGHT">▶</button>
           <button class="dbtn down" data-dir="DOWN">▼</button>
         </div>
+
+        <!-- CANVAS-SCOPED PAUSE OVERLAY (Scoped only inside maze viewport) -->
+        <div class="canvas-pause-overlay hidden" id="pauseModal">
+          <div class="pause-card">
+            <div class="modal-icon">⏸️</div>
+            <h2>GAME PAUSED</h2>
+            <p>The maze is paused. Outer controls remain accessible.</p>
+
+            <div class="pause-user-box" id="pauseUserBox">
+              <span id="pauseUserStatus">Playing as <strong>Guest</strong></span>
+              <button id="btnPauseAuth" class="btn auth-btn sm">👤 Login / Register</button>
+            </div>
+
+            <div class="pause-actions">
+              <button id="btnResume" class="btn primary lg">▶️ Resume Game (P / ESC)</button>
+              <button id="btnRestartLevel" class="btn secondary">🔄 Restart Level</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Control Panel / Sidebar -->
@@ -165,26 +184,7 @@
       </aside>
     </main>
 
-    <!-- PAUSE MODAL -->
-    <div class="modal-overlay hidden" id="pauseModal">
-      <div class="modal-card pause-card">
-        <div class="modal-icon">⏸️</div>
-        <h2>GAME PAUSED</h2>
-        <p>The AI enemy and timer are frozen while paused.</p>
-
-        <!-- Quick Auth Box inside Pause Screen -->
-        <div class="pause-user-box" id="pauseUserBox">
-          <span id="pauseUserStatus">Playing as <strong>Guest</strong></span>
-          <button id="btnPauseAuth" class="btn auth-btn sm">👤 Login / Register</button>
-        </div>
-
-        <div class="pause-actions">
-          <button id="btnResume" class="btn primary lg">▶️ Resume Game (P / ESC)</button>
-          <button id="btnRestartLevel" class="btn secondary">🔄 Restart Level</button>
-        </div>
-      </div>
-    </div>
-
+    <!-- FULL PAGE MODALS (AUTH, LEVELS, LEADERBOARD, WIN, LOSE) -->
     <!-- AUTH MODAL (Login / Register) -->
     <div class="modal-overlay hidden" id="authModal">
       <div class="modal-card auth-card">
