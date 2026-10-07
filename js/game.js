@@ -1,5 +1,5 @@
 /**
- * Maze Runner Game Engine (Interactive Upgrades & Bug Fixes)
+ * Maze Runner Game Engine (Auto-Pause & Pause Auth Integration)
  */
 class Game {
   constructor() {
@@ -35,7 +35,7 @@ class Game {
     this.hintTimer = 0;
     this.hintPath = [];
     this.particles = [];
-    this.popups = []; // Array of floating text popups { x, y, text, color, life }
+    this.popups = [];
 
     // Keys
     this.keys = {};
@@ -85,6 +85,8 @@ class Game {
 
       // Modals
       pauseModal: document.getElementById('pauseModal'),
+      pauseUserStatus: document.getElementById('pauseUserStatus'),
+      btnPauseAuth: document.getElementById('btnPauseAuth'),
       btnResume: document.getElementById('btnResume'),
       btnRestartLevel: document.getElementById('btnRestartLevel'),
 
@@ -138,9 +140,13 @@ class Game {
       this.ui.btnOpenAuth.classList.add('hidden');
       this.ui.userProfileBadge.classList.remove('hidden');
       this.ui.usernameDisplay.textContent = user.username;
+      if (this.ui.pauseUserStatus) this.ui.pauseUserStatus.innerHTML = `Logged in as <strong>${user.username}</strong>`;
+      if (this.ui.btnPauseAuth) this.ui.btnPauseAuth.classList.add('hidden');
     } else {
       this.ui.btnOpenAuth.classList.remove('hidden');
       this.ui.userProfileBadge.classList.add('hidden');
+      if (this.ui.pauseUserStatus) this.ui.pauseUserStatus.innerHTML = `Playing as <strong>Guest</strong>`;
+      if (this.ui.btnPauseAuth) this.ui.btnPauseAuth.classList.remove('hidden');
     }
   }
 
@@ -186,7 +192,6 @@ class Game {
     this.maze = new Maze(this.rows, this.cols);
     this.maze.generate();
 
-    // Reset player position & state
     this.player.r = 0;
     this.player.c = 0;
     this.player.x = (0 + 0.5) * this.cellSize;
@@ -197,7 +202,6 @@ class Game {
     this.goal.r = this.rows - 1;
     this.goal.c = this.cols - 1;
 
-    // Reset enemy position & state
     this.enemy.r = this.rows - 1;
     this.enemy.c = 0;
     this.enemy.x = (this.enemy.c + 0.5) * this.cellSize;
@@ -245,6 +249,13 @@ class Game {
     }
   }
 
+  openModalWithAutoPause(modalElement) {
+    if (this.isPlaying && !this.isPaused) {
+      this.togglePause();
+    }
+    modalElement.classList.remove('hidden');
+  }
+
   setupEventListeners() {
     // Keyboard listeners
     window.addEventListener('keydown', (e) => {
@@ -254,7 +265,7 @@ class Game {
         return;
       }
       this.keys[e.code] = true;
-      this.player.autoPath = []; // Stop auto-walk if manual keys pressed
+      this.player.autoPath = [];
       this.handlePlayerInput();
     });
 
@@ -294,7 +305,7 @@ class Game {
         );
 
         if (pathResult.path && pathResult.path.length > 1) {
-          this.player.autoPath = pathResult.path.slice(1); // Remove starting position
+          this.player.autoPath = pathResult.path.slice(1);
           this.addPopup(clickX, clickY, '🎯', '#00f3ff');
         }
       }
@@ -304,6 +315,12 @@ class Game {
     this.ui.btnPauseGame.addEventListener('click', () => this.togglePause());
     this.ui.btnResume.addEventListener('click', () => this.togglePause());
     this.ui.btnRestartLevel.addEventListener('click', () => this.initMaze());
+
+    if (this.ui.btnPauseAuth) {
+      this.ui.btnPauseAuth.addEventListener('click', () => {
+        this.ui.authModal.classList.remove('hidden');
+      });
+    }
 
     // Sidebar selects
     this.ui.algoSelect.addEventListener('change', () => {
@@ -345,8 +362,8 @@ class Game {
 
     this.ui.btnLoseRestart.addEventListener('click', () => this.initMaze());
 
-    // Auth Listeners
-    this.ui.btnOpenAuth.addEventListener('click', () => this.ui.authModal.classList.remove('hidden'));
+    // Auth Listeners (Auto-pause game when opening Auth modal)
+    this.ui.btnOpenAuth.addEventListener('click', () => this.openModalWithAutoPause(this.ui.authModal));
     this.ui.btnCloseAuth.addEventListener('click', () => this.ui.authModal.classList.add('hidden'));
 
     this.ui.tabLogin.addEventListener('click', () => {
@@ -372,6 +389,7 @@ class Game {
         const res = await api.login(user, pass);
         this.updateUserUI(res.user);
         this.ui.authModal.classList.add('hidden');
+        this.addPopup(this.canvas.width / 2, 60, `Welcome ${res.user.username}!`, '#00ff66');
       } catch (err) {
         this.ui.loginError.textContent = err.message;
         this.ui.loginError.classList.remove('hidden');
@@ -388,6 +406,7 @@ class Game {
         const res = await api.register(user, email, pass);
         this.updateUserUI(res.user);
         this.ui.authModal.classList.add('hidden');
+        this.addPopup(this.canvas.width / 2, 60, `Account Created! Welcome ${res.user.username}`, '#00ff66');
       } catch (err) {
         this.ui.regError.textContent = err.message;
         this.ui.regError.classList.remove('hidden');
@@ -400,17 +419,22 @@ class Game {
     });
 
     // Level Selector Modal Listeners
-    this.ui.btnOpenLevels.addEventListener('click', () => this.renderLevelsModal());
+    this.ui.btnOpenLevels.addEventListener('click', () => {
+      this.openModalWithAutoPause(this.ui.levelsModal);
+      this.renderLevelsModal();
+    });
     this.ui.btnCloseLevels.addEventListener('click', () => this.ui.levelsModal.classList.add('hidden'));
 
     // Leaderboard Listeners
-    this.ui.btnOpenLeaderboard.addEventListener('click', () => this.renderLeaderboardModal());
+    this.ui.btnOpenLeaderboard.addEventListener('click', () => {
+      this.openModalWithAutoPause(this.ui.leaderboardModal);
+      this.renderLeaderboardModal();
+    });
     this.ui.btnCloseLeaderboard.addEventListener('click', () => this.ui.leaderboardModal.classList.add('hidden'));
   }
 
   async renderLevelsModal() {
     this.ui.levelsGrid.innerHTML = '<div style="color:#8a99ad;">Loading levels...</div>';
-    this.ui.levelsModal.classList.remove('hidden');
 
     try {
       const res = await api.getLevels();
@@ -446,7 +470,6 @@ class Game {
 
   async renderLeaderboardModal() {
     this.ui.leaderboardBody.innerHTML = '<tr><td colspan="4">Loading leaderboard...</td></tr>';
-    this.ui.leaderboardModal.classList.remove('hidden');
 
     try {
       const res = await api.getLeaderboard();
@@ -479,7 +502,6 @@ class Game {
     const moveDelay = this.player.speedBoostTimer > 0 ? 80 : 130;
     if (now - this.lastMoveTime < moveDelay) return;
 
-    // Handle Auto-path walking (Click to walk)
     if (this.player.autoPath && this.player.autoPath.length > 0) {
       const nextCell = this.player.autoPath.shift();
       this.player.r = nextCell.r;
@@ -497,7 +519,6 @@ class Game {
       return;
     }
 
-    // Handle Manual Keyboard Input
     let moved = false;
     if (this.keys['ArrowUp'] || this.keys['KeyW']) moved = this.movePlayerDirection('UP');
     else if (this.keys['ArrowDown'] || this.keys['KeyS']) moved = this.movePlayerDirection('DOWN');
@@ -590,7 +611,6 @@ class Game {
   updateEnemy(deltaMs) {
     if (!this.isPlaying || this.isPaused || !this.maze) return;
 
-    // Continuous pixel-distance collision detection check
     const dx = this.player.x - this.enemy.x;
     const dy = this.player.y - this.enemy.y;
     const dist = Math.hypot(dx, dy);
@@ -662,7 +682,6 @@ class Game {
       }
     }
 
-    // Trigger fireworks particles
     for (let i = 0; i < 40; i++) {
       this.addParticles(
         Math.random() * this.canvas.width,
@@ -684,7 +703,6 @@ class Game {
     this.ui.loseTime.textContent = this.ui.timer.textContent;
     this.ui.loseDist.textContent = `${distToExit} steps`;
 
-    // Red explosion particle burst at player location
     this.addParticles(this.player.x, this.player.y, '#ff0055', 25);
 
     this.ui.loseModal.classList.remove('hidden');
@@ -742,14 +760,12 @@ class Game {
     const { ctx, canvas, cellSize, rows, cols } = this;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Smooth position interpolation
     this.player.x += ((this.player.c + 0.5) * cellSize - this.player.x) * 0.35;
     this.player.y += ((this.player.r + 0.5) * cellSize - this.player.y) * 0.35;
 
     this.enemy.x += ((this.enemy.c + 0.5) * cellSize - this.enemy.x) * 0.25;
     this.enemy.y += ((this.enemy.r + 0.5) * cellSize - this.enemy.y) * 0.25;
 
-    // 1. Visited Search Frontier Nodes
     if (this.showPath && this.enemy.visitedNodes) {
       ctx.fillStyle = 'rgba(157, 78, 221, 0.15)';
       for (const node of this.enemy.visitedNodes) {
@@ -757,7 +773,6 @@ class Game {
       }
     }
 
-    // 2. AI Enemy Path Line Debugger
     if (this.showPath && this.enemy.path && this.enemy.path.length > 1) {
       ctx.beginPath();
       ctx.strokeStyle = 'rgba(255, 0, 85, 0.6)';
@@ -775,7 +790,6 @@ class Game {
       ctx.setLineDash([]);
     }
 
-    // 3. Hint Route Line
     if (this.hintTimer > 0 && this.hintPath && this.hintPath.length > 0) {
       ctx.beginPath();
       ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
@@ -790,7 +804,6 @@ class Game {
       ctx.stroke();
     }
 
-    // 4. Auto-walk click path line
     if (this.player.autoPath && this.player.autoPath.length > 0) {
       ctx.beginPath();
       ctx.strokeStyle = 'rgba(0, 243, 255, 0.4)';
@@ -802,7 +815,6 @@ class Game {
       ctx.stroke();
     }
 
-    // 5. Maze Walls
     ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = Math.max(2, cellSize * 0.1);
     ctx.shadowColor = 'rgba(0, 243, 255, 0.15)';
@@ -825,7 +837,6 @@ class Game {
     }
     ctx.shadowBlur = 0;
 
-    // 6. Exit Portal (Goal)
     const goalX = (this.goal.c + 0.5) * cellSize;
     const goalY = (this.goal.r + 0.5) * cellSize;
     const goalRadius = cellSize * 0.35;
@@ -839,7 +850,6 @@ class Game {
     ctx.fillRect(-goalRadius, -goalRadius, goalRadius * 2, goalRadius * 2);
     ctx.restore();
 
-    // 7. Power-Up Icons
     if (this.maze.powerUps) {
       for (const p of this.maze.powerUps) {
         const px = (p.c + 0.5) * cellSize;
@@ -856,7 +866,6 @@ class Game {
       }
     }
 
-    // 8. Particles
     for (const p of this.particles) {
       ctx.fillStyle = p.color;
       ctx.globalAlpha = p.life;
@@ -866,7 +875,6 @@ class Game {
       ctx.globalAlpha = 1.0;
     }
 
-    // 9. Player Character
     const playerRadius = cellSize * 0.32;
     ctx.beginPath();
     ctx.arc(this.player.x, this.player.y, playerRadius, 0, Math.PI * 2);
@@ -876,7 +884,6 @@ class Game {
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // 10. AI Enemy Chaser
     const enemyRadius = cellSize * 0.34;
     ctx.beginPath();
     ctx.arc(this.enemy.x, this.enemy.y, enemyRadius, 0, Math.PI * 2);
@@ -894,7 +901,6 @@ class Game {
       ctx.fillText('❄️', this.enemy.x, this.enemy.y);
     }
 
-    // 11. Render Popups Text
     for (const p of this.popups) {
       ctx.save();
       ctx.font = 'bold 13px Orbitron, sans-serif';
@@ -905,7 +911,6 @@ class Game {
       ctx.restore();
     }
 
-    // 12. Fog of War Spotlight
     if (this.fogOfWar) {
       ctx.save();
       ctx.fillStyle = '#050811';

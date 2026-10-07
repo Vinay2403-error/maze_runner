@@ -170,7 +170,14 @@
       <div class="modal-card pause-card">
         <div class="modal-icon">⏸️</div>
         <h2>GAME PAUSED</h2>
-        <p>Take a breath. The AI enemy is frozen while paused.</p>
+        <p>The AI enemy and timer are frozen while paused.</p>
+
+        <!-- Quick Auth Box inside Pause Screen -->
+        <div class="pause-user-box" id="pauseUserBox">
+          <span id="pauseUserStatus">Playing as <strong>Guest</strong></span>
+          <button id="btnPauseAuth" class="btn auth-btn sm">👤 Login / Register</button>
+        </div>
+
         <div class="pause-actions">
           <button id="btnResume" class="btn primary lg">▶️ Resume Game (P / ESC)</button>
           <button id="btnRestartLevel" class="btn secondary">🔄 Restart Level</button>
@@ -208,15 +215,15 @@
             <input type="text" id="regUser" required placeholder="Choose a username" />
           </div>
           <div class="form-group">
-            <label for="regEmail">Email:</label>
-            <input type="email" id="regEmail" required placeholder="Enter your email" />
+            <label for="regEmail">Email (e.g. Gmail):</label>
+            <input type="email" id="regEmail" required placeholder="name@gmail.com" />
           </div>
           <div class="form-group">
             <label for="regPass">Password:</label>
             <input type="password" id="regPass" required placeholder="Choose a password (min 4 chars)" />
           </div>
           <div class="form-error hidden" id="regError"></div>
-          <button type="submit" class="btn success block">Create Account & Play</button>
+          <button type="submit" class="btn success block">Create Account & Save Progress</button>
         </form>
       </div>
     </div>
