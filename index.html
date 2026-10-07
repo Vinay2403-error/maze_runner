@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Maze Runner - AI Pathfinding Chaser</title>
+  <title>Maze Runner AI - Campaign & Auth</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,6 +17,7 @@
         <span class="logo-icon">⚡</span>
         <h1>MAZE RUNNER <span class="highlight">AI</span></h1>
       </div>
+
       <div class="hud">
         <div class="hud-card">
           <span class="hud-label">TIME</span>
@@ -35,15 +36,32 @@
           <span class="hud-value buff" id="hudBuff">None</span>
         </div>
       </div>
+
+      <!-- User Auth Status Widget -->
+      <div class="user-widget" id="userWidget">
+        <button id="btnOpenAuth" class="btn auth-btn">👤 Login / Register</button>
+        <div id="userProfileBadge" class="user-profile-badge hidden">
+          <span class="user-avatar">🎮</span>
+          <span id="usernameDisplay" class="username">Guest</span>
+          <button id="btnLogout" class="btn-icon" title="Logout">🚪</button>
+        </div>
+      </div>
     </header>
 
     <!-- Main Content Area -->
     <main class="game-layout">
       <!-- Game Canvas Container -->
       <div class="canvas-wrapper">
+        <div class="canvas-header-bar">
+          <span class="mode-badge" id="currentModeBadge">Campaign Level 1</span>
+          <div class="canvas-actions">
+            <button id="btnPauseGame" class="btn-icon-label" title="Pause Game (ESC / P)">⏸️ Pause</button>
+          </div>
+        </div>
+
         <canvas id="gameCanvas" width="700" height="700"></canvas>
         
-        <!-- On-screen D-Pad overlay for mobile/touch -->
+        <!-- Touch D-Pad overlay -->
         <div class="touch-controls" id="touchControls">
           <button class="dbtn up" data-dir="UP">▲</button>
           <button class="dbtn left" data-dir="LEFT">◀</button>
@@ -54,6 +72,15 @@
 
       <!-- Control Panel / Sidebar -->
       <aside class="sidebar">
+        <!-- Campaign Levels & Leaderboard Section -->
+        <section class="panel-section campaign-section">
+          <h2><span class="icon">🏆</span> Campaign Mode</h2>
+          <div class="control-group">
+            <button id="btnOpenLevels" class="btn primary highlight-btn">🗺️ Select Level (1-10)</button>
+            <button id="btnOpenLeaderboard" class="btn secondary">🥇 Global Leaderboard</button>
+          </div>
+        </section>
+
         <!-- AI Settings -->
         <section class="panel-section">
           <h2><span class="icon">🤖</span> AI Pathfinding</h2>
@@ -75,9 +102,9 @@
           </div>
         </section>
 
-        <!-- Maze Settings -->
+        <!-- Custom Maze Generator -->
         <section class="panel-section">
-          <h2><span class="icon">🧩</span> Maze Configuration</h2>
+          <h2><span class="icon">🧩</span> Free Play Generator</h2>
           <div class="control-group">
             <label for="sizeSelect">Grid Size:</label>
             <select id="sizeSelect" class="styled-select">
@@ -87,11 +114,11 @@
             </select>
           </div>
           <div class="control-group">
-            <button id="btnNewMaze" class="btn primary">🔄 Generate New Maze</button>
+            <button id="btnNewMaze" class="btn secondary">🔄 New Random Maze</button>
           </div>
         </section>
 
-        <!-- Display & Gameplay Toggles -->
+        <!-- Visuals & Toggles -->
         <section class="panel-section">
           <h2><span class="icon">👁️</span> Visuals & FX</h2>
           <div class="toggle-group">
@@ -99,7 +126,7 @@
               <input type="checkbox" id="chkShowPath" checked />
               <span class="slider"></span>
             </label>
-            <span class="toggle-label">Show AI Path & Nodes (Debugger)</span>
+            <span class="toggle-label">Show AI Path & Nodes</span>
           </div>
 
           <div class="toggle-group">
@@ -107,7 +134,7 @@
               <input type="checkbox" id="chkFogOfWar" />
               <span class="slider"></span>
             </label>
-            <span class="toggle-label">Fog of War (Dark Spotlight)</span>
+            <span class="toggle-label">Fog of War Spotlight</span>
           </div>
 
           <div class="toggle-group">
@@ -115,13 +142,13 @@
               <input type="checkbox" id="chkAudio" checked />
               <span class="slider"></span>
             </label>
-            <span class="toggle-label">Sound Effects & Synth Audio</span>
+            <span class="toggle-label">Sound Effects</span>
           </div>
         </section>
 
-        <!-- Pathfinding Metrics / Realtime Stats -->
+        <!-- Pathfinding Metrics -->
         <section class="panel-section stats-panel">
-          <h2><span class="icon">📊</span> AI Metrics</h2>
+          <h2><span class="icon">📊</span> AI Realtime Metrics</h2>
           <div class="stat-row">
             <span>Nodes Explored:</span>
             <strong id="statNodesExplored">0</strong>
@@ -135,34 +162,117 @@
             <strong id="statPathLength">0 steps</strong>
           </div>
         </section>
-
-        <!-- Controls Legend -->
-        <section class="panel-section legend-panel">
-          <h2><span class="icon">🎮</span> Legend & Controls</h2>
-          <div class="legend-grid">
-            <div class="legend-item"><span class="dot player-dot"></span> Player (Arrow/WASD)</div>
-            <div class="legend-item"><span class="dot enemy-dot"></span> AI Enemy (Chaser)</div>
-            <div class="legend-item"><span class="dot exit-dot"></span> Goal Exit</div>
-            <div class="legend-item"><span class="dot power-speed">⚡</span> Speed Boost</div>
-            <div class="legend-item"><span class="dot power-freeze">❄️</span> Freeze AI</div>
-            <div class="legend-item"><span class="dot power-path">💡</span> Route Hint</div>
-          </div>
-        </section>
       </aside>
     </main>
+
+    <!-- PAUSE MODAL -->
+    <div class="modal-overlay hidden" id="pauseModal">
+      <div class="modal-card pause-card">
+        <div class="modal-icon">⏸️</div>
+        <h2>GAME PAUSED</h2>
+        <p>Take a breath. The AI enemy is frozen while paused.</p>
+        <div class="pause-actions">
+          <button id="btnResume" class="btn primary lg">▶️ Resume Game (P / ESC)</button>
+          <button id="btnRestartLevel" class="btn secondary">🔄 Restart Level</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUTH MODAL (Login / Register) -->
+    <div class="modal-overlay hidden" id="authModal">
+      <div class="modal-card auth-card">
+        <button class="close-modal-btn" id="btnCloseAuth">✕</button>
+        <div class="auth-tabs">
+          <button class="auth-tab active" id="tabLogin">Login</button>
+          <button class="auth-tab" id="tabRegister">Create Account</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="loginForm" class="auth-form">
+          <div class="form-group">
+            <label for="loginUser">Username or Email:</label>
+            <input type="text" id="loginUser" required placeholder="Enter username/email" />
+          </div>
+          <div class="form-group">
+            <label for="loginPass">Password:</label>
+            <input type="password" id="loginPass" required placeholder="Enter password" />
+          </div>
+          <div class="form-error hidden" id="loginError"></div>
+          <button type="submit" class="btn primary block">Login to Account</button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="registerForm" class="auth-form hidden">
+          <div class="form-group">
+            <label for="regUser">Username:</label>
+            <input type="text" id="regUser" required placeholder="Choose a username" />
+          </div>
+          <div class="form-group">
+            <label for="regEmail">Email:</label>
+            <input type="email" id="regEmail" required placeholder="Enter your email" />
+          </div>
+          <div class="form-group">
+            <label for="regPass">Password:</label>
+            <input type="password" id="regPass" required placeholder="Choose a password (min 4 chars)" />
+          </div>
+          <div class="form-error hidden" id="regError"></div>
+          <button type="submit" class="btn success block">Create Account & Play</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- LEVEL SELECTOR MODAL -->
+    <div class="modal-overlay hidden" id="levelsModal">
+      <div class="modal-card levels-card">
+        <button class="close-modal-btn" id="btnCloseLevels">✕</button>
+        <h2>🏆 Campaign Levels (1-10)</h2>
+        <p>Unlock levels sequentially by escaping each maze!</p>
+
+        <div class="levels-grid" id="levelsGrid">
+          <!-- Level Cards rendered dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD MODAL -->
+    <div class="modal-overlay hidden" id="leaderboardModal">
+      <div class="modal-card leaderboard-card">
+        <button class="close-modal-btn" id="btnCloseLeaderboard">✕</button>
+        <h2>🥇 Global Leaderboard</h2>
+        <p>Top players ranked by completed levels & best times</p>
+        <div class="table-wrapper">
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Player</th>
+                <th>Levels Beaten</th>
+                <th>Total Time</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
     <!-- Win Modal -->
     <div class="modal-overlay hidden" id="winModal">
       <div class="modal-card win">
         <div class="modal-icon">🏆</div>
-        <h2>MAZE ESCAPED!</h2>
-        <p>You successfully outmaneuvered the AI enemy!</p>
+        <h2>LEVEL ESCAPED!</h2>
+        <p>You outmaneuvered the AI chaser!</p>
         <div class="modal-stats">
           <div><span>Time Taken:</span> <strong id="winTime">00:00</strong></div>
           <div><span>Algorithm Used:</span> <strong id="winAlgo">A*</strong></div>
           <div><span>Grid Size:</span> <strong id="winSize">21x21</strong></div>
         </div>
-        <button id="btnWinRestart" class="btn success">Play Next Maze 🚀</button>
+        <div class="modal-buttons">
+          <button id="btnNextLevel" class="btn success">Next Level 🚀</button>
+          <button id="btnWinRestart" class="btn secondary">Replay Level 🔄</button>
+        </div>
       </div>
     </div>
 
@@ -185,6 +295,7 @@
   <script src="js/maze.js"></script>
   <script src="js/pathfinding.js"></script>
   <script src="js/audio.js"></script>
+  <script src="js/api.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>
