@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maze Runner - AI Pathfinding Chaser</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <h1>MAZE RUNNER <span class="highlight">AI</span></h1>
+      </div>
+      <div class="hud">
+        <div class="hud-card">
+          <span class="hud-label">TIME</span>
+          <span class="hud-value" id="hudTimer">00:00</span>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">GOAL DIST</span>
+          <span class="hud-value" id="hudGoalDist">--</span>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">ENEMY DIST</span>
+          <span class="hud-value danger" id="hudEnemyDist">--</span>
+        </div>
+        <div class="hud-card">
+          <span class="hud-label">ACTIVE BUFF</span>
+          <span class="hud-value buff" id="hudBuff">None</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="game-layout">
+      <!-- Game Canvas Container -->
+      <div class="canvas-wrapper">
+        <canvas id="gameCanvas" width="700" height="700"></canvas>
+        
+        <!-- On-screen D-Pad overlay for mobile/touch -->
+        <div class="touch-controls" id="touchControls">
+          <button class="dbtn up" data-dir="UP">▲</button>
+          <button class="dbtn left" data-dir="LEFT">◀</button>
+          <button class="dbtn right" data-dir="RIGHT">▶</button>
+          <button class="dbtn down" data-dir="DOWN">▼</button>
+        </div>
+      </div>
+
+      <!-- Control Panel / Sidebar -->
+      <aside class="sidebar">
+        <!-- AI Settings -->
+        <section class="panel-section">
+          <h2><span class="icon">🤖</span> AI Pathfinding</h2>
+          <div class="control-group">
+            <label for="algoSelect">Algorithm:</label>
+            <select id="algoSelect" class="styled-select">
+              <option value="astar">A* (A-Star Heuristic Search)</option>
+              <option value="bfs">BFS (Breadth-First Search)</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="speedSelect">AI Speed:</label>
+            <select id="speedSelect" class="styled-select">
+              <option value="easy">Slow (Easy)</option>
+              <option value="medium" selected>Normal (Medium)</option>
+              <option value="hard">Fast (Hard)</option>
+              <option value="nightmare">Relentless (Nightmare)</option>
+            </select>
+          </div>
+        </section>
+
+        <!-- Maze Settings -->
+        <section class="panel-section">
+          <h2><span class="icon">🧩</span> Maze Configuration</h2>
+          <div class="control-group">
+            <label for="sizeSelect">Grid Size:</label>
+            <select id="sizeSelect" class="styled-select">
+              <option value="15">Small (15 × 15)</option>
+              <option value="21" selected>Medium (21 × 21)</option>
+              <option value="31">Large (31 × 31)</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <button id="btnNewMaze" class="btn primary">🔄 Generate New Maze</button>
+          </div>
+        </section>
+
+        <!-- Display & Gameplay Toggles -->
+        <section class="panel-section">
+          <h2><span class="icon">👁️</span> Visuals & FX</h2>
+          <div class="toggle-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="chkShowPath" checked />
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-label">Show AI Path & Nodes (Debugger)</span>
+          </div>
+
+          <div class="toggle-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="chkFogOfWar" />
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-label">Fog of War (Dark Spotlight)</span>
+          </div>
+
+          <div class="toggle-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="chkAudio" checked />
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-label">Sound Effects & Synth Audio</span>
+          </div>
+        </section>
+
+        <!-- Pathfinding Metrics / Realtime Stats -->
+        <section class="panel-section stats-panel">
+          <h2><span class="icon">📊</span> AI Metrics</h2>
+          <div class="stat-row">
+            <span>Nodes Explored:</span>
+            <strong id="statNodesExplored">0</strong>
+          </div>
+          <div class="stat-row">
+            <span>Compute Time:</span>
+            <strong id="statComputeTime">0.00 ms</strong>
+          </div>
+          <div class="stat-row">
+            <span>Path Length:</span>
+            <strong id="statPathLength">0 steps</strong>
+          </div>
+        </section>
+
+        <!-- Controls Legend -->
+        <section class="panel-section legend-panel">
+          <h2><span class="icon">🎮</span> Legend & Controls</h2>
+          <div class="legend-grid">
+            <div class="legend-item"><span class="dot player-dot"></span> Player (Arrow/WASD)</div>
+            <div class="legend-item"><span class="dot enemy-dot"></span> AI Enemy (Chaser)</div>
+            <div class="legend-item"><span class="dot exit-dot"></span> Goal Exit</div>
+            <div class="legend-item"><span class="dot power-speed">⚡</span> Speed Boost</div>
+            <div class="legend-item"><span class="dot power-freeze">❄️</span> Freeze AI</div>
+            <div class="legend-item"><span class="dot power-path">💡</span> Route Hint</div>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <!-- Win Modal -->
+    <div class="modal-overlay hidden" id="winModal">
+      <div class="modal-card win">
+        <div class="modal-icon">🏆</div>
+        <h2>MAZE ESCAPED!</h2>
+        <p>You successfully outmaneuvered the AI enemy!</p>
+        <div class="modal-stats">
+          <div><span>Time Taken:</span> <strong id="winTime">00:00</strong></div>
+          <div><span>Algorithm Used:</span> <strong id="winAlgo">A*</strong></div>
+          <div><span>Grid Size:</span> <strong id="winSize">21x21</strong></div>
+        </div>
+        <button id="btnWinRestart" class="btn success">Play Next Maze 🚀</button>
+      </div>
+    </div>
+
+    <!-- Lose Modal -->
+    <div class="modal-overlay hidden" id="loseModal">
+      <div class="modal-card lose">
+        <div class="modal-icon">☠️</div>
+        <h2>CAUGHT BY AI!</h2>
+        <p>The AI hunter tracked down your exact path!</p>
+        <div class="modal-stats">
+          <div><span>Survival Time:</span> <strong id="loseTime">00:00</strong></div>
+          <div><span>Distance to Exit:</span> <strong id="loseDist">0</strong></div>
+        </div>
+        <button id="btnLoseRestart" class="btn danger">Try Again 🔄</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/maze.js"></script>
+  <script src="js/pathfinding.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
